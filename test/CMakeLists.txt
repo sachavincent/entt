@@ -63,7 +63,6 @@ function(SETUP_TARGET TARGET_NAME)
             PRIVATE
                 # disabling INCREMENTAL is required by SizeBench
                 $<$<CONFIG:Debug>:/INCREMENTAL:NO>
-                $<$<CONFIG:Release>:/OPT:NOICF>
         )
     else()
         target_compile_options(
@@ -116,12 +115,13 @@ function(SETUP_LIB_PLUGIN_TEST TEST_NAME SUB_PATH)
     add_library(_${TARGET_NAME} MODULE $<TARGET_OBJECTS:odr> lib/${TEST_NAME}/${SUB_PATH}/plugin.cpp)
     SETUP_TARGET(_${TARGET_NAME} ${ARGVN})
     SETUP_BASIC_TEST(lib_${TARGET_NAME} lib/${TEST_NAME}/${SUB_PATH}/main.cpp PLUGIN="$<TARGET_FILE:_${TARGET_NAME}>" ${ARGVN})
-    target_link_libraries(_${TARGET_NAME} PRIVATE cr::cr)
-    target_link_libraries(lib_${TARGET_NAME} PRIVATE cr::cr ${CMAKE_DL_LIBS})
     set_target_properties(_${TARGET_NAME} PROPERTIES CXX_CLANG_TIDY "")
     set_target_properties(lib_${TARGET_NAME} PROPERTIES CXX_CLANG_TIDY "")
+    target_include_directories(_${TARGET_NAME} PRIVATE ${cr_INCLUDE_DIR})
+    target_include_directories(lib_${TARGET_NAME} PRIVATE ${cr_INCLUDE_DIR})
     target_compile_options(_${TARGET_NAME} PRIVATE $<$<NOT:$<STREQUAL:"${CMAKE_CXX_COMPILER_ID}","MSVC">>:-Wno-conversion>)
     target_compile_options(lib_${TARGET_NAME} PRIVATE $<$<NOT:$<STREQUAL:"${CMAKE_CXX_COMPILER_ID}","MSVC">>:-Wno-conversion>)
+    target_link_libraries(lib_${TARGET_NAME} PRIVATE ${CMAKE_DL_LIBS})
     add_dependencies(lib_${TARGET_NAME} _${TARGET_NAME})
 endfunction()
 
@@ -151,9 +151,12 @@ if(ENTT_BUILD_LIB)
         GIT_SHALLOW 1
     )
 
-    FetchContent_MakeAvailable(cr)
+    FetchContent_GetProperties(cr)
 
-    add_library(cr::cr ALIAS cr)
+    if(NOT cr_POPULATED)
+        FetchContent_Populate(cr)
+        set(cr_INCLUDE_DIR ${cr_SOURCE_DIR})
+    endif()
 
     SETUP_LIB_SHARED_TEST(dispatcher shared)
     SETUP_LIB_PLUGIN_TEST(dispatcher plugin)
